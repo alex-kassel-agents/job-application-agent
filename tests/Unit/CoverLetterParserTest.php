@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace AlexKasselAgents\JobApplicationAgent\Tests\Unit;
 
-use AlexKasselAgents\JobApplicationAgent\Services\AnschreibenParser;
+use AlexKasselAgents\JobApplicationAgent\Services\CoverLetterParser;
 use AlexKasselAgents\JobApplicationAgent\Tests\TestCase;
 
-final class AnschreibenParserTest extends TestCase
+final class CoverLetterParserTest extends TestCase
 {
     public function test_it_parses_json_template(): void
     {
-        $templatePath = __DIR__.'/../../resources/templates/anschreiben_template.json';
-        $parser = new AnschreibenParser;
+        $templatePath = __DIR__.'/../../resources/templates/cover_letter_template.json';
+        $parser = new CoverLetterParser;
 
         $data = $parser->parseFile($templatePath);
 
@@ -27,8 +27,8 @@ final class AnschreibenParserTest extends TestCase
 
     public function test_it_parses_markdown_template(): void
     {
-        $templatePath = __DIR__.'/../../resources/templates/anschreiben_template.md';
-        $parser = new AnschreibenParser;
+        $templatePath = __DIR__.'/../../resources/templates/cover_letter_template.md';
+        $parser = new CoverLetterParser;
 
         $data = $parser->parseFile($templatePath);
 
@@ -40,8 +40,8 @@ final class AnschreibenParserTest extends TestCase
 
     public function test_it_generates_correct_markdown_representation(): void
     {
-        $templatePath = __DIR__.'/../../resources/templates/anschreiben_template.json';
-        $parser = new AnschreibenParser;
+        $templatePath = __DIR__.'/../../resources/templates/cover_letter_template.json';
+        $parser = new CoverLetterParser;
 
         $data = $parser->parseFile($templatePath);
         $md = $data->toMarkdown();

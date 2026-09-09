@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace AlexKasselAgents\JobApplicationAgent;
 
-use AlexKasselAgents\JobApplicationAgent\Commands\RenderAnschreibenCommand;
-use AlexKasselAgents\JobApplicationAgent\Services\AnschreibenParser;
+use AlexKasselAgents\JobApplicationAgent\Commands\RenderCoverLetterCommand;
 use AlexKasselAgents\JobApplicationAgent\Services\BrowserFinder;
+use AlexKasselAgents\JobApplicationAgent\Services\CoverLetterParser;
 use AlexKasselAgents\JobApplicationAgent\Services\Din5008PdfRenderer;
 use AlexKasselAgents\JobApplicationAgent\Services\PdfPageCounter;
 use Illuminate\Contracts\Config\Repository;
@@ -30,7 +30,7 @@ final class JobApplicationAgentServiceProvider extends ServiceProvider
 
         $this->app->singleton(PdfPageCounter::class, static fn (): PdfPageCounter => new PdfPageCounter);
 
-        $this->app->singleton(AnschreibenParser::class, static function (Application $app): AnschreibenParser {
+        $this->app->singleton(CoverLetterParser::class, static function (Application $app): CoverLetterParser {
             /** @var Repository $config */
             $config = $app->make('config');
             /** @var string $defaultCity */
@@ -38,7 +38,7 @@ final class JobApplicationAgentServiceProvider extends ServiceProvider
             /** @var string $defaultSignoff */
             $defaultSignoff = $config->get('job-application-agent.din5008.default_signoff', 'Mit freundlichen Grüßen');
 
-            return new AnschreibenParser(
+            return new CoverLetterParser(
                 defaultCity: $defaultCity,
                 defaultSignoff: $defaultSignoff,
             );
@@ -77,7 +77,7 @@ final class JobApplicationAgentServiceProvider extends ServiceProvider
             ], 'job-application-templates');
 
             $this->commands([
-                RenderAnschreibenCommand::class,
+                RenderCoverLetterCommand::class,
             ]);
         }
     }

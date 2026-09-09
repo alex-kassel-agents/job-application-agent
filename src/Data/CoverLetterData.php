@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace AlexKasselAgents\JobApplicationAgent\Data;
 
-final readonly class AnschreibenData
+final readonly class CoverLetterData
 {
     /**
      * @param  array<int, string>  $recipientLines

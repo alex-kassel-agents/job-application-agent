@@ -6,7 +6,7 @@ namespace AlexKasselAgents\JobApplicationAgent\Tests\Feature;
 
 use AlexKasselAgents\JobApplicationAgent\Tests\TestCase;
 
-final class RenderAnschreibenCommandTest extends TestCase
+final class RenderCoverLetterCommandTest extends TestCase
 {
     public function test_it_fails_when_input_file_does_not_exist(): void
     {
@@ -17,7 +17,7 @@ final class RenderAnschreibenCommandTest extends TestCase
 
     public function test_it_renders_json_template_to_pdf(): void
     {
-        $templatePath = __DIR__.'/../../resources/templates/anschreiben_template.json';
+        $templatePath = __DIR__.'/../../resources/templates/cover_letter_template.json';
         $tempOutput = tempnam(sys_get_temp_dir(), 'test_job_render_').'.pdf';
 
         try {

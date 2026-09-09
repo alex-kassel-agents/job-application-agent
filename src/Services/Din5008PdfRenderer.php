@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace AlexKasselAgents\JobApplicationAgent\Services;
 
-use AlexKasselAgents\JobApplicationAgent\Data\AnschreibenData;
+use AlexKasselAgents\JobApplicationAgent\Data\CoverLetterData;
 use AlexKasselAgents\JobApplicationAgent\Data\DensityTier;
 use AlexKasselAgents\JobApplicationAgent\Data\RenderResult;
 use RuntimeException;
@@ -19,7 +19,7 @@ final class Din5008PdfRenderer
     ) {}
 
     public function render(
-        AnschreibenData $data,
+        CoverLetterData $data,
         string $outputPdfPath,
         ?DensityTier $forceTier = null,
         ?string $templatePath = null,
@@ -91,7 +91,7 @@ final class Din5008PdfRenderer
         );
     }
 
-    public function compileHtml(string $template, AnschreibenData $data, DensityTier $tier): string
+    public function compileHtml(string $template, CoverLetterData $data, DensityTier $tier): string
     {
         $vars = $data->toTemplateVariables($tier);
         $html = $template;

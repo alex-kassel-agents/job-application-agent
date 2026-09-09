@@ -5,18 +5,18 @@ declare(strict_types=1);
 namespace AlexKasselAgents\JobApplicationAgent\Commands;
 
 use AlexKasselAgents\JobApplicationAgent\Data\DensityTier;
-use AlexKasselAgents\JobApplicationAgent\Services\AnschreibenParser;
+use AlexKasselAgents\JobApplicationAgent\Services\CoverLetterParser;
 use AlexKasselAgents\JobApplicationAgent\Services\Din5008PdfRenderer;
 use Illuminate\Console\Command;
 use Throwable;
 
-final class RenderAnschreibenCommand extends Command
+final class RenderCoverLetterCommand extends Command
 {
     /**
      * @var string
      */
     protected $signature = 'job:render
-                            {input : Path to JSON or Markdown Anschreiben file}
+                            {input : Path to JSON or Markdown cover letter file}
                             {--output= : Target PDF output path}
                             {--density= : Force density tier (normal, compact, ultra-compact)}
                             {--keep-companion-md : Generate or update companion Markdown when input is JSON}';
@@ -26,7 +26,7 @@ final class RenderAnschreibenCommand extends Command
      */
     protected $description = 'Render a DIN 5008 compliant single-page PDF cover letter from JSON or Markdown';
 
-    public function handle(AnschreibenParser $parser, Din5008PdfRenderer $renderer): int
+    public function handle(CoverLetterParser $parser, Din5008PdfRenderer $renderer): int
     {
         $rawInput = $this->argument('input');
         $inputArg = is_string($rawInput) ? $rawInput : '';
@@ -62,7 +62,7 @@ final class RenderAnschreibenCommand extends Command
             }
         }
 
-        $this->info(sprintf('Parsing Anschreiben from: %s', $inputPath));
+        $this->info(sprintf('Parsing cover letter from: %s', $inputPath));
 
         try {
             $data = $parser->parseFile($inputPath);

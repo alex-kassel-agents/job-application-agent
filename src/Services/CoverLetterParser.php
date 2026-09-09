@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace AlexKasselAgents\JobApplicationAgent\Services;
 
-use AlexKasselAgents\JobApplicationAgent\Data\AnschreibenData;
+use AlexKasselAgents\JobApplicationAgent\Data\CoverLetterData;
 use DateTimeImmutable;
 use InvalidArgumentException;
 use RuntimeException;
 
-final class AnschreibenParser
+final class CoverLetterParser
 {
     /**
      * @param  array<string, string>  $defaultSender
@@ -25,7 +25,7 @@ final class AnschreibenParser
         private readonly string $defaultSignoff = 'Mit freundlichen Grüßen',
     ) {}
 
-    public function parseFile(string $filePath): AnschreibenData
+    public function parseFile(string $filePath): CoverLetterData
     {
         if (! file_exists($filePath)) {
             throw new RuntimeException(sprintf('File not found: %s', $filePath));
@@ -41,7 +41,7 @@ final class AnschreibenParser
         return $this->parseMarkdown($content);
     }
 
-    public function parseJson(string $json): AnschreibenData
+    public function parseJson(string $json): CoverLetterData
     {
         /** @var mixed $data */
         $data = json_decode($json, true);
@@ -113,7 +113,7 @@ final class AnschreibenParser
         $signerName = (string) ($data['signature_name'] ?? $senderName);
         $attachments = (string) ($data['attachments'] ?? 'Anlagen');
 
-        return new AnschreibenData(
+        return new CoverLetterData(
             senderName: $senderName,
             senderAddress: $senderAddress,
             senderPhone: $senderPhone,
@@ -134,7 +134,7 @@ final class AnschreibenParser
         );
     }
 
-    public function parseMarkdown(string $markdown): AnschreibenData
+    public function parseMarkdown(string $markdown): CoverLetterData
     {
         $senderName = $this->defaultSender['name'];
         $senderAddress = $this->defaultSender['address'];
@@ -354,7 +354,7 @@ final class AnschreibenParser
             $salutation = 'Sehr geehrte Damen und Herren,';
         }
 
-        return new AnschreibenData(
+        return new CoverLetterData(
             senderName: $senderName,
             senderAddress: $senderAddress,
             senderPhone: $senderPhone,
