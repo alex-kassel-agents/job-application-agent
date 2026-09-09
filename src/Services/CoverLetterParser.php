@@ -8,22 +8,39 @@ use AlexKasselAgents\JobApplicationAgent\Data\CoverLetterData;
 use DateTimeImmutable;
 use InvalidArgumentException;
 use RuntimeException;
+use Symfony\Component\Yaml\Yaml;
 
 final class CoverLetterParser
 {
     /**
-     * @param  array<string, string>  $defaultSender
+     * @var array<string, string>|null
+     */
+    private ?array $defaultSender;
+
+    /**
+     * @param  array<string, string>|null  $defaultSender
      */
     public function __construct(
-        private readonly array $defaultSender = [
-            'name' => 'Max Mustermann',
-            'address' => 'Musterstraße 12, 10115 Berlin',
-            'phone' => '+49 30 12345678',
-            'email' => 'max.mustermann@example.com',
-        ],
-        private readonly string $defaultCity = 'Berlin',
+        ?array $defaultSender = null,
+        private readonly ?string $defaultCity = null,
         private readonly string $defaultSignoff = 'Mit freundlichen Grüßen',
-    ) {}
+        private readonly ?string $profilePath = null,
+    ) {
+        $this->defaultSender = $defaultSender;
+
+        if ($this->defaultSender === null) {
+            $effectiveProfile = $this->profilePath;
+            if ($effectiveProfile === null && function_exists('config')) {
+                /** @var string|null $cfgProfile */
+                $cfgProfile = config('job-application-agent.profile_path');
+                $effectiveProfile = $cfgProfile;
+            }
+
+            if ($effectiveProfile !== null && $effectiveProfile !== '') {
+                $this->defaultSender = $this->loadSenderFromProfile($effectiveProfile);
+            }
+        }
+    }
 
     public function parseFile(string $filePath): CoverLetterData
     {
@@ -50,19 +67,20 @@ final class CoverLetterParser
             throw new InvalidArgumentException('Invalid JSON payload provided.');
         }
 
-        /** @var array<string, mixed> $sender */
-        $sender = is_array($data['sender'] ?? null) ? $data['sender'] : [];
+        /** @var array<string, mixed> $senderRaw */
+        $senderRaw = is_array($data['sender'] ?? null) ? $data['sender'] : [];
+        $sender = $this->resolveSender($senderRaw);
+        $senderName = $sender['name'];
+        $senderAddress = $sender['address'];
+        $senderPhone = $sender['phone'];
+        $senderEmail = $sender['email'];
+
         /** @var array<string, mixed> $recipient */
         $recipient = is_array($data['recipient'] ?? null) ? $data['recipient'] : [];
         /** @var array<string, mixed> $meta */
         $meta = is_array($data['meta'] ?? null) ? $data['meta'] : [];
         /** @var array<string, mixed> $content */
         $content = is_array($data['content'] ?? null) ? $data['content'] : [];
-
-        $senderName = (string) ($sender['name'] ?? $this->defaultSender['name']);
-        $senderAddress = (string) ($sender['address'] ?? $this->defaultSender['address']);
-        $senderPhone = (string) ($sender['phone'] ?? $this->defaultSender['phone']);
-        $senderEmail = (string) ($sender['email'] ?? $this->defaultSender['email']);
 
         $recipientLines = [];
         foreach (['company', 'department', 'contact_person', 'street', 'city'] as $key) {
@@ -71,7 +89,9 @@ final class CoverLetterParser
             }
         }
 
-        $city = (string) ($meta['city'] ?? $this->defaultCity);
+        $city = isset($meta['city']) && is_string($meta['city']) && trim($meta['city']) !== ''
+            ? trim($meta['city'])
+            : $this->defaultCity;
         $rawDate = (string) ($meta['date'] ?? '');
         $dateLine = $this->resolveDateLine($rawDate, $city);
 
@@ -136,28 +156,27 @@ final class CoverLetterParser
 
     public function parseMarkdown(string $markdown): CoverLetterData
     {
-        $senderName = $this->defaultSender['name'];
-        $senderAddress = $this->defaultSender['address'];
-        $senderPhone = $this->defaultSender['phone'];
-        $senderEmail = $this->defaultSender['email'];
+        $senderRaw = [];
         $recipientLines = [];
         $dateLine = '';
         $subjectTitle = '';
         $referenceLine = null;
         $salutation = '';
         $bodyText = $markdown;
+        $city = $this->defaultCity;
 
         // Extract YAML Frontmatter if present
         if (preg_match('/^---\s*\r?\n(.*?)\r?\n---\s*\r?\n(.*)$/s', $markdown, $matches)) {
             $frontmatter = $matches[1];
             $bodyText = $matches[2];
 
-            $fm = $this->parseSimpleYaml($frontmatter);
+            /** @var mixed $parsedYaml */
+            $parsedYaml = Yaml::parse($frontmatter);
+            $fm = is_array($parsedYaml) ? $parsedYaml : [];
+
             if (isset($fm['sender']) && is_array($fm['sender'])) {
-                $senderName = (string) ($fm['sender']['name'] ?? $senderName);
-                $senderAddress = (string) ($fm['sender']['address'] ?? $senderAddress);
-                $senderPhone = (string) ($fm['sender']['phone'] ?? $senderPhone);
-                $senderEmail = (string) ($fm['sender']['email'] ?? $senderEmail);
+                /** @var array<string, mixed> $senderRaw */
+                $senderRaw = $fm['sender'];
             }
 
             if (isset($fm['recipient']) && is_array($fm['recipient'])) {
@@ -173,7 +192,9 @@ final class CoverLetterParser
                 if (isset($fm['meta']['reference_nr']) && is_string($fm['meta']['reference_nr'])) {
                     $referenceLine = trim($fm['meta']['reference_nr']);
                 }
-                $city = (string) ($fm['meta']['city'] ?? $this->defaultCity);
+                if (isset($fm['meta']['city']) && is_string($fm['meta']['city']) && trim($fm['meta']['city']) !== '') {
+                    $city = trim($fm['meta']['city']);
+                }
                 $dateVal = (string) ($fm['meta']['date'] ?? '');
                 if ($dateVal !== '') {
                     $dateLine = $this->resolveDateLine($dateVal, $city);
@@ -185,6 +206,8 @@ final class CoverLetterParser
             }
         }
 
+        $sender = $this->resolveSender($senderRaw);
+
         $lines = preg_split('/\r\n|\r|\n/', trim($bodyText)) ?: [];
         $bodyParagraphs = [];
         $bulletPoints = [];
@@ -192,12 +215,14 @@ final class CoverLetterParser
         $conditions = null;
         $outro = null;
         $signoff = $this->defaultSignoff;
-        $signerName = $senderName;
+        $signerName = $sender['name'];
         $attachments = 'Anlagen';
 
-        $state = ($salutation !== '' || ($recipientLines !== [] && $subjectTitle !== '')) ? 'BODY' : 'HEADER';
+        $hasFrontmatterHeader = ($salutation !== '' || ($recipientLines !== [] && $subjectTitle !== ''));
+        $state = $hasFrontmatterHeader ? 'BODY' : 'HEADER';
         $blocks = [];
         $currentBlock = [];
+        $discoveredRecipient = [];
 
         foreach ($lines as $rawLine) {
             $line = trim($rawLine);
@@ -208,35 +233,42 @@ final class CoverLetterParser
                     $currentBlock = [];
                 }
 
+                if ($state === 'HEADER_SENDER' && $discoveredRecipient === []) {
+                    $state = 'HEADER_RECIPIENT';
+                }
+
                 continue;
             }
 
-            if ($state === 'HEADER') {
+            // Skip markdown title comment like "# Anschreiben-Entwurf (Version 1)"
+            if (str_starts_with($line, '#') && (str_contains(strtolower($line), 'anschreiben') || str_contains(strtolower($line), 'entwurf') || str_contains(strtolower($line), 'version'))) {
+                continue;
+            }
+
+            if ($state === 'HEADER' || $state === 'HEADER_SENDER' || $state === 'HEADER_RECIPIENT') {
                 if (str_contains($line, 'Telefon:') || str_contains($line, 'E-Mail:')) {
                     if (str_contains($line, 'Telefon:')) {
-                        $senderPhone = trim(explode('Telefon:', $line)[1], " \t•|,\n\r");
+                        $sender['phone'] = trim(explode('Telefon:', $line)[1], " \t•|,\n\r");
                     }
                     if (str_contains($line, 'E-Mail:')) {
-                        $senderEmail = trim(explode('E-Mail:', $line)[1], " \t•|,\n\r");
+                        $sender['email'] = trim(explode('E-Mail:', $line)[1], " \t•|,\n\r");
                     }
+                    $state = 'HEADER_SENDER';
 
                     continue;
                 }
 
                 if (str_contains($line, '•')) {
                     $parts = array_map('trim', explode('•', $line));
-                    if (count($parts) >= 2) {
-                        $senderName = $parts[0];
-                        $senderAddress = $parts[1];
+                    if (count($parts) >= 2 && ! str_contains(strtolower($parts[0]), 'gmbh') && ! str_contains(strtolower($parts[0]), 'ag')) {
+                        $sender['name'] = trim($parts[0], "*# \t");
+                        $sender['address'] = trim($parts[1], "*# \t");
+                        $state = 'HEADER_SENDER';
 
                         continue;
                     }
                 }
 
-                $state = 'RECIPIENT';
-            }
-
-            if ($state === 'RECIPIENT') {
                 if ($this->isDateLine($line)) {
                     $dateLine = trim($line, "*# \t");
                     $state = 'AFTER_RECIPIENT';
@@ -245,12 +277,37 @@ final class CoverLetterParser
                 }
 
                 if ($this->isSubjectLine($line)) {
+                    $subjectTitle = trim($line, "*# \t");
                     $state = 'AFTER_RECIPIENT';
-                } else {
-                    $recipientLines[] = trim($line, "*# \t");
 
                     continue;
                 }
+
+                if (str_starts_with($line, 'Sehr geehrte') || str_starts_with($line, 'Guten Tag') || str_starts_with($line, 'Hallo')) {
+                    $salutation = trim($line, "*# \t");
+                    $state = 'BODY';
+
+                    continue;
+                }
+
+                if ($state === 'HEADER') {
+                    if (str_starts_with($line, '**') && str_ends_with($line, '**')) {
+                        $sender['name'] = trim($line, "*# \t");
+                        $state = 'HEADER_SENDER';
+
+                        continue;
+                    }
+
+                    $discoveredRecipient[] = trim($line, "*# \t");
+                } elseif ($state === 'HEADER_SENDER') {
+                    if (preg_match('/^\d{5}\s+\S+/u', $line)) {
+                        $sender['address'] = trim($line, "*# \t");
+                    }
+                } elseif ($state === 'HEADER_RECIPIENT') {
+                    $discoveredRecipient[] = trim($line, "*# \t");
+                }
+
+                continue;
             }
 
             if ($state === 'AFTER_RECIPIENT') {
@@ -307,11 +364,16 @@ final class CoverLetterParser
             }
         }
 
+        if ($recipientLines === [] && $discoveredRecipient !== []) {
+            $recipientLines = $discoveredRecipient;
+        }
+
         if ($currentBlock !== []) {
             $blocks[] = $currentBlock;
         }
 
         // Categorize extracted blocks
+        $totalBlocks = count($blocks);
         foreach ($blocks as $blockIndex => $block) {
             $isList = false;
             foreach ($block as $bLine) {
@@ -333,9 +395,9 @@ final class CoverLetterParser
             $joined = implode(' ', $block);
             if ($blockIndex === 0 && $intro === '') {
                 $intro = $joined;
-            } elseif (str_contains($joined, 'Gehalt') || str_contains($joined, 'Verfügung') || str_contains($joined, 'Kündigungsfrist')) {
+            } elseif ($this->isConditionsBlock($joined, $blockIndex, $totalBlocks)) {
                 $conditions = $joined;
-            } elseif ($blockIndex === count($blocks) - 1 && (str_contains($joined, 'Gespräch') || str_contains($joined, 'freue mich') || str_contains($joined, 'sehe mit Interesse'))) {
+            } elseif ($this->isOutroBlock($joined, $blockIndex, $totalBlocks)) {
                 $outro = $joined;
             } else {
                 $bodyParagraphs[] = $joined;
@@ -343,7 +405,7 @@ final class CoverLetterParser
         }
 
         if ($dateLine === '') {
-            $dateLine = $this->resolveDateLine('', $this->defaultCity);
+            $dateLine = $this->resolveDateLine('', $city);
         }
 
         if ($subjectTitle === '') {
@@ -355,10 +417,10 @@ final class CoverLetterParser
         }
 
         return new CoverLetterData(
-            senderName: $senderName,
-            senderAddress: $senderAddress,
-            senderPhone: $senderPhone,
-            senderEmail: $senderEmail,
+            senderName: $sender['name'],
+            senderAddress: $sender['address'],
+            senderPhone: $sender['phone'],
+            senderEmail: $sender['email'],
             recipientLines: $recipientLines,
             dateLine: $dateLine,
             subjectTitle: $subjectTitle,
@@ -375,11 +437,16 @@ final class CoverLetterParser
         );
     }
 
-    private function resolveDateLine(string $dateStr, string $city): string
+    private function resolveDateLine(string $dateStr, ?string $city = null): string
     {
+        $effectiveCity = $city ?? $this->defaultCity;
+        if ($effectiveCity === null && $this->defaultSender !== null && isset($this->defaultSender['address'])) {
+            $effectiveCity = $this->extractCityFromAddress($this->defaultSender['address']);
+        }
+
         if ($dateStr !== '') {
-            if ($city !== '' && ! str_starts_with($dateStr, $city)) {
-                return sprintf('%s, den %s', $city, $dateStr);
+            if ($effectiveCity !== null && $effectiveCity !== '' && ! str_starts_with($dateStr, $effectiveCity)) {
+                return sprintf('%s, den %s', $effectiveCity, $dateStr);
             }
 
             return $dateStr;
@@ -394,7 +461,134 @@ final class CoverLetterParser
 
         $formatted = sprintf('%d. %s %d', (int) $now->format('j'), $months[(int) $now->format('n')], (int) $now->format('Y'));
 
-        return $city !== '' ? sprintf('%s, den %s', $city, $formatted) : $formatted;
+        return ($effectiveCity !== null && $effectiveCity !== '')
+            ? sprintf('%s, den %s', $effectiveCity, $formatted)
+            : $formatted;
+    }
+
+    private function isConditionsBlock(string $text, int $index, int $total): bool
+    {
+        if ($index < max(0, $total - 3)) {
+            return false;
+        }
+
+        $lower = strtolower($text);
+
+        return str_contains($lower, 'gehalt')
+            || str_contains($lower, 'kündigungsfrist')
+            || (str_contains($lower, 'verfügung') && (str_contains($lower, 'sofort') || str_contains($lower, 'ab dem') || str_contains($lower, 'eintritt') || str_contains($lower, 'arbeitsbeginn') || str_contains($lower, 'arbeitsaufnahme')));
+    }
+
+    private function isOutroBlock(string $text, int $index, int $total): bool
+    {
+        if ($index < max(0, $total - 2)) {
+            return false;
+        }
+
+        $lower = strtolower($text);
+
+        return str_contains($lower, 'gespräch')
+            || str_contains($lower, 'freue mich')
+            || str_contains($lower, 'sehe mit interesse')
+            || str_contains($lower, 'einladung');
+    }
+
+    private function extractCityFromAddress(string $address): ?string
+    {
+        if (preg_match('/\b\d{5}\s+([A-ZÄÖÜa-zäöüß\-]+)/u', $address, $matches)) {
+            return trim($matches[1]);
+        }
+
+        if (str_contains($address, ',')) {
+            $parts = explode(',', $address);
+            $lastPart = trim(end($parts));
+            $cleaned = preg_replace('/^\d+\s*/', '', $lastPart);
+            if (is_string($cleaned) && trim($cleaned) !== '') {
+                return trim($cleaned);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $dataSender
+     * @return array{name: string, address: string, phone: string, email: string}
+     */
+    private function resolveSender(array $dataSender): array
+    {
+        $name = isset($dataSender['name']) && is_string($dataSender['name']) && trim($dataSender['name']) !== ''
+            ? trim($dataSender['name'])
+            : ($this->defaultSender['name'] ?? null);
+
+        $address = isset($dataSender['address']) && is_string($dataSender['address']) && trim($dataSender['address']) !== ''
+            ? trim($dataSender['address'])
+            : ($this->defaultSender['address'] ?? null);
+
+        $phone = isset($dataSender['phone']) && is_string($dataSender['phone'])
+            ? trim($dataSender['phone'])
+            : ($this->defaultSender['phone'] ?? '');
+
+        $email = isset($dataSender['email']) && is_string($dataSender['email'])
+            ? trim($dataSender['email'])
+            : ($this->defaultSender['email'] ?? '');
+
+        if ($name === null || $address === null) {
+            throw new InvalidArgumentException('Sender name and address are required. Provide them in document frontmatter, configure defaultSender, or set candidate profile_path.');
+        }
+
+        return [
+            'name' => $name,
+            'address' => $address,
+            'phone' => (string) $phone,
+            'email' => (string) $email,
+        ];
+    }
+
+    /**
+     * @return array{name: string, address: string, phone: string, email: string}|null
+     */
+    private function loadSenderFromProfile(string $profilePath): ?array
+    {
+        $resolved = realpath($profilePath) ?: $profilePath;
+        $personalDataFile = is_dir($resolved)
+            ? $resolved.DIRECTORY_SEPARATOR.'personal_data.md'
+            : $resolved;
+
+        if (! file_exists($personalDataFile)) {
+            return null;
+        }
+
+        $content = (string) file_get_contents($personalDataFile);
+        $name = null;
+        $address = null;
+        $phone = null;
+        $email = null;
+
+        $lines = preg_split('/\r\n|\r|\n/', $content) ?: [];
+        foreach ($lines as $line) {
+            $trimmed = trim($line);
+            if (preg_match('/^[-*]?\s*\*{0,2}Name\*{0,2}\s*:\s*(.+)$/i', $trimmed, $m)) {
+                $name = trim($m[1]);
+            } elseif (preg_match('/^[-*]?\s*\*{0,2}(?:Adresse|Address)\*{0,2}\s*:\s*(.+)$/i', $trimmed, $m)) {
+                $address = trim($m[1]);
+            } elseif (preg_match('/^[-*]?\s*\*{0,2}(?:Telefon|Phone)\*{0,2}\s*:\s*(.+)$/i', $trimmed, $m)) {
+                $phone = trim($m[1]);
+            } elseif (preg_match('/^[-*]?\s*\*{0,2}(?:E-Mail|Email)\*{0,2}\s*:\s*(.+)$/i', $trimmed, $m)) {
+                $email = trim($m[1]);
+            }
+        }
+
+        if ($name === null || $address === null) {
+            return null;
+        }
+
+        return [
+            'name' => $name,
+            'address' => $address,
+            'phone' => $phone ?? '',
+            'email' => $email ?? '',
+        ];
     }
 
     private function isDateLine(string $line): bool
@@ -415,49 +609,5 @@ final class CoverLetterParser
             || str_starts_with($line, '**Bewerbung')
             || str_starts_with($line, 'Bewerbung als')
             || str_contains($lower, 'bewerbung');
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function parseSimpleYaml(string $yaml): array
-    {
-        $result = [];
-        $currentSection = null;
-
-        $lines = preg_split('/\r\n|\r|\n/', $yaml) ?: [];
-        foreach ($lines as $raw) {
-            if (trim($raw) === '' || str_starts_with(trim($raw), '#')) {
-                continue;
-            }
-
-            // Top-level key: e.g. "salutation: '...'" or "sender:"
-            if (preg_match('/^([a-zA-Z0-9_]+)\s*:\s*(.*)$/', $raw, $m)) {
-                $key = trim($m[1]);
-                $val = trim($m[2]);
-
-                if ($val === '') {
-                    $currentSection = $key;
-                    $result[$currentSection] = [];
-                } else {
-                    $currentSection = null;
-                    $result[$key] = trim($val, " '\"\t\n\r");
-                }
-
-                continue;
-            }
-
-            // Indented key: e.g. "  name: '...'"
-            if ($currentSection !== null && preg_match('/^\s+([a-zA-Z0-9_]+)\s*:\s*(.*)$/', $raw, $sub)) {
-                $subKey = trim($sub[1]);
-                $subVal = trim($sub[2], " '\"\t\n\r");
-                /** @var array<string, mixed> $sectionData */
-                $sectionData = is_array($result[$currentSection]) ? $result[$currentSection] : [];
-                $sectionData[$subKey] = $subVal;
-                $result[$currentSection] = $sectionData;
-            }
-        }
-
-        return $result;
     }
 }

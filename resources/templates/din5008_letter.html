@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>{{ title }}</title>
+<title>{{SUBJECT_TITLE}}</title>
 <style>
   @page {
     size: A4 portrait;
@@ -167,17 +167,9 @@
   }
 
   /* Auto-Fit Density Profiles for 1-page DIN 5008 Guarantee */
+  /* DIN 5008 Form B invariant: Address window position (top 45mm) is preserved */
   .sheet.compact {
-    padding: 16mm 20mm 12mm 25mm;
-  }
-  .sheet.compact .address-zone {
-    margin-top: 4mm;
-    margin-bottom: 2mm;
-    min-height: 34mm;
-  }
-  .sheet.compact .date-line {
-    margin-top: -4mm;
-    margin-bottom: 3mm;
+    padding: 20mm 20mm 12mm 25mm;
   }
   .sheet.compact .subject-block {
     margin-bottom: 3mm;
@@ -203,16 +195,7 @@
   }
 
   .sheet.ultra-compact {
-    padding: 13mm 18mm 10mm 25mm;
-  }
-  .sheet.ultra-compact .address-zone {
-    margin-top: 2.5mm;
-    margin-bottom: 1.5mm;
-    min-height: 32mm;
-  }
-  .sheet.ultra-compact .date-line {
-    margin-top: -3mm;
-    margin-bottom: 2mm;
+    padding: 20mm 18mm 10mm 25mm;
   }
   .sheet.ultra-compact .subject-block {
     margin-bottom: 2.5mm;
@@ -222,8 +205,8 @@
   }
   .sheet.ultra-compact .content p {
     font-size: 8.3pt;
-    line-height: 1.21;
-    margin-bottom: 1.6mm;
+    line-height: 1.20;
+    margin-bottom: 1.5mm;
   }
   .sheet.ultra-compact .content li {
     font-size: 8.2pt;
@@ -283,10 +266,10 @@
 
   <!-- Gruß & Unterschrift -->
   <div class="closing-block">
-    <div>Mit freundlichen Grüßen</div>
+    <div>{{SIGNOFF}}</div>
     <div class="signature-space"></div>
-    <div class="signer-name">{{SENDER_NAME}}</div>
-    <div class="attachments">Anlagen</div>
+    <div class="signer-name">{{SIGNER_NAME}}</div>
+    <div class="attachments">{{ATTACHMENTS}}</div>
   </div>
 </div>
 </body>

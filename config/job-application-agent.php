@@ -45,7 +45,7 @@ return [
     */
     'din5008' => [
         'form' => 'B',
-        'default_city' => env('JOB_APPLICATION_DEFAULT_CITY', 'Berlin'),
+        'default_city' => env('JOB_APPLICATION_DEFAULT_CITY', null),
         'default_signoff' => 'Mit freundlichen Grüßen',
     ],
 ];

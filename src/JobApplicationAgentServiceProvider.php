@@ -36,14 +36,17 @@ final class JobApplicationAgentServiceProvider extends ServiceProvider
         $this->app->singleton(CoverLetterParser::class, static function (Application $app): CoverLetterParser {
             /** @var Repository $config */
             $config = $app->make('config');
-            /** @var string $defaultCity */
-            $defaultCity = $config->get('job-application-agent.din5008.default_city', 'Berlin');
+            /** @var string|null $defaultCity */
+            $defaultCity = $config->get('job-application-agent.din5008.default_city');
             /** @var string $defaultSignoff */
             $defaultSignoff = $config->get('job-application-agent.din5008.default_signoff', 'Mit freundlichen Grüßen');
+            /** @var string|null $profilePath */
+            $profilePath = $config->get('job-application-agent.profile_path');
 
             return new CoverLetterParser(
                 defaultCity: $defaultCity,
                 defaultSignoff: $defaultSignoff,
+                profilePath: $profilePath,
             );
         });
 
