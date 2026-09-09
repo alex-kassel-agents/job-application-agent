@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>{{ title }}</title>
+<style>
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+  body {
+    font-family: 'Segoe UI', Calibri, Arial, sans-serif;
+    color: #1a1a1a;
+    background: #fff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .sheet {
+    position: relative;
+    width: 210mm;
+    min-height: 297mm;
+    padding: 20mm 20mm 16mm 25mm; /* DIN 5008: left margin 25mm */
+    background: #fff;
+    page-break-after: avoid;
+  }
+  /* DIN 5008 Falz- und Lochmarken */
+  .mark-fold-1 {
+    position: absolute;
+    left: 4mm;
+    top: 105mm;
+    width: 4mm;
+    border-top: 0.5pt solid #999;
+  }
+  .mark-punch {
+    position: absolute;
+    left: 4mm;
+    top: 148.5mm;
+    width: 6mm;
+    border-top: 0.5pt solid #999;
+  }
+  .mark-fold-2 {
+    position: absolute;
+    left: 4mm;
+    top: 210mm;
+    width: 4mm;
+    border-top: 0.5pt solid #999;
+  }
+
+  /* Briefkopf: Absender & Empfänger */
+  .header-grid {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 2mm;
+  }
+  .sender-block {
+    text-align: right;
+    font-size: 8.8pt;
+    color: #333;
+    line-height: 1.35;
+  }
+  .sender-name {
+    font-size: 11pt;
+    font-weight: 700;
+    color: #111;
+  }
+
+  /* Anschriftfeld (DIN 5008 Form B) */
+  .address-zone {
+    width: 85mm;
+    min-height: 38mm;
+    margin-top: 6mm;
+    margin-bottom: 3mm;
+  }
+  .sender-return-line {
+    font-size: 7pt;
+    color: #666;
+    border-bottom: 0.5pt solid #bbb;
+    padding-bottom: 1mm;
+    margin-bottom: 2mm;
+    letter-spacing: 0.2px;
+  }
+  .recipient-address {
+    font-size: 9.3pt;
+    line-height: 1.35;
+    color: #111;
+  }
+
+  /* Datumszeile */
+  .date-line {
+    text-align: right;
+    font-size: 9.3pt;
+    color: #333;
+    margin-top: -5mm;
+    margin-bottom: 5mm;
+  }
+
+  /* Betreffzeile */
+  .subject-block {
+    margin-bottom: 4mm;
+  }
+  .subject-title {
+    font-size: 10.8pt;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.3;
+  }
+  .reference-line {
+    font-size: 8.8pt;
+    font-weight: 600;
+    color: #475569;
+    margin-top: 0.8mm;
+  }
+
+  /* Anrede und Textkörper */
+  .salutation {
+    font-size: 9.5pt;
+    font-weight: 600;
+    margin-bottom: 3mm;
+    color: #111;
+  }
+  .content p {
+    font-size: 9.1pt;
+    line-height: 1.34;
+    margin-bottom: 2.6mm;
+    text-align: justify;
+    hyphens: auto;
+  }
+  .content ul {
+    margin: 1.8mm 0 2.4mm 0;
+    padding-left: 4.5mm;
+  }
+  .content li {
+    font-size: 9.0pt;
+    line-height: 1.30;
+    margin-bottom: 1.2mm;
+    text-align: justify;
+  }
+  .content strong {
+    font-weight: 600;
+    color: #0f172a;
+  }
+
+  /* Grußformel und Unterschrift */
+  .closing-block {
+    margin-top: 3mm;
+    font-size: 9.2pt;
+    line-height: 1.32;
+  }
+  .signature-space {
+    height: 10mm;
+  }
+  .signer-name {
+    font-weight: 600;
+    color: #111;
+  }
+  .attachments {
+    margin-top: 2.5mm;
+    font-size: 8.8pt;
+    font-weight: 700;
+    color: #334155;
+  }
+
+  /* Auto-Fit Density Profiles for 1-page DIN 5008 Guarantee */
+  .sheet.compact {
+    padding: 16mm 20mm 12mm 25mm;
+  }
+  .sheet.compact .address-zone {
+    margin-top: 4mm;
+    margin-bottom: 2mm;
+    min-height: 34mm;
+  }
+  .sheet.compact .date-line {
+    margin-top: -4mm;
+    margin-bottom: 3mm;
+  }
+  .sheet.compact .subject-block {
+    margin-bottom: 3mm;
+  }
+  .sheet.compact .salutation {
+    margin-bottom: 2mm;
+  }
+  .sheet.compact .content p {
+    font-size: 8.8pt;
+    line-height: 1.28;
+    margin-bottom: 2mm;
+  }
+  .sheet.compact .content li {
+    font-size: 8.7pt;
+    line-height: 1.24;
+    margin-bottom: 1mm;
+  }
+  .sheet.compact .closing-block {
+    margin-top: 2.5mm;
+  }
+  .sheet.compact .signature-space {
+    height: 7mm;
+  }
+
+  .sheet.ultra-compact {
+    padding: 13mm 18mm 10mm 25mm;
+  }
+  .sheet.ultra-compact .address-zone {
+    margin-top: 2.5mm;
+    margin-bottom: 1.5mm;
+    min-height: 32mm;
+  }
+  .sheet.ultra-compact .date-line {
+    margin-top: -3mm;
+    margin-bottom: 2mm;
+  }
+  .sheet.ultra-compact .subject-block {
+    margin-bottom: 2.5mm;
+  }
+  .sheet.ultra-compact .salutation {
+    margin-bottom: 1.8mm;
+  }
+  .sheet.ultra-compact .content p {
+    font-size: 8.3pt;
+    line-height: 1.21;
+    margin-bottom: 1.6mm;
+  }
+  .sheet.ultra-compact .content li {
+    font-size: 8.2pt;
+    line-height: 1.18;
+    margin-bottom: 0.8mm;
+  }
+  .sheet.ultra-compact .closing-block {
+    margin-top: 2mm;
+  }
+  .sheet.ultra-compact .signature-space {
+    height: 5mm;
+  }
+</style>
+</head>
+<body>
+<div class="sheet {{DENSITY_CLASS}}">
+  <!-- Falz- und Lochmarken -->
+  <div class="mark-fold-1"></div>
+  <div class="mark-punch"></div>
+  <div class="mark-fold-2"></div>
+
+  <!-- Absender rechts oben -->
+  <div class="header-grid">
+    <div style="width: 85mm;"></div>
+    <div class="sender-block">
+      <div class="sender-name">{{SENDER_NAME}}</div>
+      <div>{{SENDER_ADDRESS}}</div>
+      <div>Telefon: {{SENDER_PHONE}}</div>
+      <div>E-Mail: {{SENDER_EMAIL}}</div>
+    </div>
+  </div>
+
+  <!-- Empfänger mit Rücksendeangabe (Fensterumschlag-Zone) -->
+  <div class="address-zone">
+    <div class="sender-return-line">{{SENDER_RETURN_LINE}}</div>
+    <div class="recipient-address">
+      {{RECIPIENT_HTML}}
+    </div>
+  </div>
+
+  <!-- Datum -->
+  <div class="date-line">{{DATE_LINE}}</div>
+
+  <!-- Betreff -->
+  <div class="subject-block">
+    <div class="subject-title">{{SUBJECT_TITLE}}</div>
+    {{REFERENCE_LINE_HTML}}
+  </div>
+
+  <!-- Anrede -->
+  <div class="salutation">{{SALUTATION}}</div>
+
+  <!-- Text -->
+  <div class="content">
+    {{BODY_HTML}}
+  </div>
+
+  <!-- Gruß & Unterschrift -->
+  <div class="closing-block">
+    <div>Mit freundlichen Grüßen</div>
+    <div class="signature-space"></div>
+    <div class="signer-name">{{SENDER_NAME}}</div>
+    <div class="attachments">Anlagen</div>
+  </div>
+</div>
+</body>
+</html>
