@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace AlexKasselAgents\JobApplicationAgent;
 
+use AlexKasselAgents\JobApplicationAgent\Commands\CreateSessionCommand;
 use AlexKasselAgents\JobApplicationAgent\Commands\RenderCoverLetterCommand;
+use AlexKasselAgents\JobApplicationAgent\Commands\SessionBusStepCommand;
 use AlexKasselAgents\JobApplicationAgent\Services\BrowserFinder;
 use AlexKasselAgents\JobApplicationAgent\Services\CoverLetterParser;
 use AlexKasselAgents\JobApplicationAgent\Services\Din5008PdfRenderer;
 use AlexKasselAgents\JobApplicationAgent\Services\PdfPageCounter;
+use AlexKasselAgents\JobApplicationAgent\Services\SessionBusManager;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
@@ -63,6 +66,8 @@ final class JobApplicationAgentServiceProvider extends ServiceProvider
                 defaultTemplatePath: $templateFile,
             );
         });
+
+        $this->app->singleton(SessionBusManager::class, static fn (): SessionBusManager => new SessionBusManager);
     }
 
     public function boot(): void
@@ -78,6 +83,8 @@ final class JobApplicationAgentServiceProvider extends ServiceProvider
 
             $this->commands([
                 RenderCoverLetterCommand::class,
+                CreateSessionCommand::class,
+                SessionBusStepCommand::class,
             ]);
         }
     }
